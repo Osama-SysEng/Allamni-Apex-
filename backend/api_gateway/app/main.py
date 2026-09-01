@@ -1,0 +1,46 @@
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+import httpx, os
+
+app = FastAPI(title="Allamni API Gateway", version="1.0.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS","http://localhost:8080").split(","),
+    allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
+)
+
+TARGETS = {
+    "auth": os.getenv("AUTH_URL","http://localhost:8001"),
+    "learning": os.getenv("LEARNING_URL","http://localhost:8002"),
+    "ai": os.getenv("AI_URL","http://localhost:8003"),
+    "integration": os.getenv("INTEGRATION_URL","http://localhost:8004"),
+}
+
+@app.get("/health")
+def health():
+    return {"status":"ok","service":"gateway","targets":list(TARGETS)}
+
+async def proxy(request: Request, target: str, prefix: str):
+    path = request.url.path[len(prefix):] or "/"
+    url = TARGETS[target] + path
+    if request.url.query:
+        url += "?" + request.url.query
+    body = await request.body()
+    headers = {k:v for k,v in request.headers.items() if k.lower() not in {"host","content-length"}}
+    async with httpx.AsyncClient(timeout=120) as client:
+        r = await client.request(request.method, url, content=body, headers=headers)
+    return Response(content=r.content, status_code=r.status_code,
+                    headers={"content-type":r.headers.get("content-type","application/json")})
+
+def register(prefix,target):
+    async def handler(request: Request):
+        return await proxy(request,target,prefix)
+    app.add_api_route(prefix+"/{path:path}",handler,
+                      methods=["GET","POST","PUT","PATCH","DELETE"],
+                      include_in_schema=False)
+
+register("/api/auth","auth")
+register("/api/learning","learning")
+register("/api/ai","ai")
+register("/api/integration","integration")
