@@ -1,0 +1,179 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: allamni-postgres
+    environment:
+      POSTGRES_DB: allamni
+      POSTGRES_USER: allamni_user
+      POSTGRES_PASSWORD: allamni_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/scripts/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U allamni_user -d allamni"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: allamni-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./backend/api_gateway
+      dockerfile: Dockerfile
+    container_name: allamni-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - AUTH_URL=http://auth-service:8001
+      - LEARNING_URL=http://learning-service:8002
+      - AI_URL=http://ai-service:8003
+      - INTEGRATION_URL=http://integration-service:8004
+      - INSTITUTION_URL=http://institution-service:8005
+      - CORS_ALLOWED_ORIGINS=http://localhost:8080,http://localhost:3000
+    depends_on:
+      - auth-service
+      - ai-service
+      - institution-service
+    networks:
+      - allamni-network
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ./backend/services/auth-service
+      dockerfile: Dockerfile
+    container_name: allamni-auth-service
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://allamni_user:allamni_password@postgres:5432/allamni
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET_KEY=dev_secret_key_change_in_production
+      - JWT_ACCESS_MINUTES=30
+      - JWT_REFRESH_DAYS=7
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - allamni-network
+
+  # AI Service
+  ai-service:
+    build:
+      context: ./backend/services/ai-service
+      dockerfile: Dockerfile
+    container_name: allamni-ai-service
+    ports:
+      - "8003:8003"
+    environment:
+      - AI_PROVIDER=mock
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=gemini-1.5-pro
+      - DATABASE_URL=postgresql://allamni_user:allamni_password@postgres:5432/allamni
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - allamni-network
+
+  # Institution Service
+  institution-service:
+    build:
+      context: ./backend/services/institution-service
+      dockerfile: Dockerfile
+    container_name: allamni-institution-service
+    ports:
+      - "8005:8005"
+    environment:
+      - DATABASE_URL=postgresql://allamni_user:allamni_password@postgres:5432/allamni
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - allamni-network
+
+  # Integration Service
+  integration-service:
+    build:
+      context: ./backend/services/integration-service
+      dockerfile: Dockerfile
+    container_name: allamni-integration-service
+    ports:
+      - "8004:8004"
+    environment:
+      - ODOO_URL=${ODOO_URL:-}
+      - ODOO_API_KEY=${ODOO_API_KEY:-}
+      - ODOO_DATABASE=${ODOO_DATABASE:-}
+      - DATABASE_URL=postgresql://allamni_user:allamni_password@postgres:5432/allamni
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - allamni-network
+
+  # Monitoring (Prometheus)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: allamni-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - allamni-network
+
+  # Monitoring (Grafana)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: allamni-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infrastructure/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - allamni-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  allamni-network:
+    driver: bridge

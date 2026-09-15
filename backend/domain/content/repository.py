@@ -1,0 +1,6 @@
+from typing import Protocol
+from .contracts import ContentPage, ContentSnapshot
+
+class ContentRepository(Protocol):
+    def get(self, identifier: str, actor_id: str) -> ContentSnapshot | None: ...
+    def list_for_owner(self, actor_id: str, cursor: str | None = None, limit: int = 50) -> ContentPage: ...

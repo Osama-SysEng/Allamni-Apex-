@@ -1,0 +1,12 @@
+{
+  "name":"Allamni",
+  "arabic_name":"علّمني",
+  "version":"3.0.0",
+  "architecture":"agentic-adaptive-education-os",
+  "principles":["deterministic-critical-paths","agentic-reasoning","human-approval-for-high-impact-actions","event-driven","idempotent","observable"],
+  "agents":["student_agent","assessment_agent","tutor_agent","content_agent","institution_agent"],
+  "intelligence":["digital-learning-twin","cognitive-profile","risk-engine","adaptive-difficulty","next-best-action","dynamic-roadmap","learning-memory","content-blueprints"],
+  "infrastructure":["PostgreSQL","Redis","Qdrant","Prometheus","Grafana","Docker"],
+  "integrations":["Odoo-outbox","LLM-provider-contract","educational-resource-registry"],
+  "status":"production-oriented architecture; external credentials/infrastructure required for live integrations"
+}
