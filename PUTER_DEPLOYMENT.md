@@ -1,15 +1,214 @@
-# Allamni v4.0 - Puter.com Deployment Configuration
+# Allamni v4.0 - Puter.com Deployment Guide
 
-## Overview
-This document provides comprehensive deployment configuration for Allamni v4.0 on Puter.com, including environment setup, secrets management, and service configuration.
+## 🚀 Quick Start Deployment
 
-## Prerequisites
-- Puter.com account
-- Domain name (optional)
-- PostgreSQL database (Puter provides managed instances)
-- Redis instance (Puter provides managed instances)
-- External AI provider credentials (Gemini API key)
-- Odoo integration credentials (if applicable)
+### Step 1: Create Puter.com Account
+1. Go to https://puter.com
+2. Sign up for a free account
+3. Verify your email address
+
+### Step 2: Create New Project
+1. Click "Create New Project"
+2. Project name: `allamni-v4`
+3. Description: `Allamni v4.0 - AI-Native Education Operating System`
+4. Runtime: `Python 3.11`
+5. Region: Choose closest to your users
+
+### Step 3: Upload Project Files
+1. Click "Upload Files" or "Connect GitHub"
+2. Upload all files from the Allamni-Apex directory
+3. Alternatively, connect your GitHub repository: https://github.com/Osama-SysEng/Allamni-Apex-
+
+### Step 4: Configure Database
+1. Go to "Resources" → "Add Database"
+2. Select "PostgreSQL"
+3. Database name: `allamni`
+4. Size: `Small` (for testing) or `Medium` (for production)
+5. Note the connection details (will be used in environment variables)
+
+### Step 5: Configure Redis
+1. Go to "Resources" → "Add Cache"
+2. Select "Redis"
+3. Cache name: `allamni-cache`
+4. Size: `Small`
+5. Note the connection details
+
+### Step 6: Configure Environment Variables
+Go to "Settings" → "Environment Variables" and add:
+
+```bash
+# Database Configuration
+DATABASE_URL=postgresql://your_db_user:your_db_password@your_db_host:5432/allamni
+REDIS_URL=redis://your_redis_host:6379
+
+# AI Provider Configuration
+AI_PROVIDER=mock  # Change to 'gemini' when you have API key
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-1.5-pro
+
+# Security Configuration
+JWT_SECRET_KEY=your_jwt_secret_key_here_change_in_production
+JWT_ACCESS_MINUTES=30
+JWT_REFRESH_DAYS=7
+
+# Service URLs (Puter internal URLs)
+AUTH_URL=http://auth-service:8001
+LEARNING_URL=http://learning-service:8002
+AI_URL=http://ai-service:8003
+INTEGRATION_URL=http://integration-service:8004
+INSTITUTION_URL=http://institution-service:8005
+
+# CORS Configuration
+CORS_ALLOWED_ORIGINS=https://allamni.puter.com
+
+# Monitoring
+LOG_LEVEL=info
+```
+
+### Step 7: Configure Services
+In Puter.com, create the following services:
+
+#### API Gateway
+- Name: `api-gateway`
+- Build context: `backend/api_gateway`
+- Port: `8000`
+- Environment variables: `AUTH_URL`, `AI_URL`, `INSTITUTION_URL`, `CORS_ALLOWED_ORIGINS`
+
+#### Auth Service
+- Name: `auth-service`
+- Build context: `backend/services/auth-service`
+- Port: `8001`
+- Environment variables: `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET_KEY`
+
+#### AI Service
+- Name: `ai-service`
+- Build context: `backend/services/ai-service`
+- Port: `8003`
+- Environment variables: `AI_PROVIDER`, `GEMINI_API_KEY`, `DATABASE_URL`
+
+#### Institution Service
+- Name: `institution-service`
+- Build context: `backend/services/institution-service`
+- Port: `8005`
+- Environment variables: `DATABASE_URL`, `REDIS_URL`
+
+### Step 8: Deploy
+1. Click "Deploy" for each service
+2. Wait for deployment to complete
+3. Check deployment logs for any errors
+
+### Step 9: Run Database Migrations
+1. Go to "Terminal" in Puter.com
+2. Run the migration script:
+```bash
+psql $DATABASE_URL -f infrastructure/scripts/migrations/001_add_institutions_and_codes.sql
+```
+
+### Step 10: Configure Domain
+1. Go to "Domains" → "Add Domain"
+2. Primary domain: `allamni.puter.com` (auto-generated)
+3. Custom domain: Add your own domain if desired
+4. Configure DNS records if using custom domain
+
+### Step 11: Test Deployment
+Test the following endpoints:
+- API Gateway: `https://allamni.puter.com/health`
+- Auth Service: `https://allamni.puter.com/api/auth/health`
+- AI Service: `https://allamni.puter.com/api/ai/health`
+
+## 📱 Flutter App Deployment
+
+### Build Flutter Web App
+```bash
+cd flutter_app
+flutter build web --release
+```
+
+### Deploy to Puter Static Hosting
+1. Go to "Static Files" in Puter.com
+2. Upload the contents of `flutter_app/build/web`
+3. Configure routing to serve as single-page app
+4. Access at: `https://allamni.puter.com`
+
+## 🔧 Advanced Configuration
+
+### Auto-scaling Configuration
+In Puter.com dashboard, configure auto-scaling for each service:
+- API Gateway: 1-3 instances, target CPU 70%
+- Auth Service: 1-2 instances, target CPU 60%
+- AI Service: 1-2 instances, target CPU 80%
+
+### Monitoring Setup
+1. Enable Prometheus metrics in each service
+2. Configure Grafana dashboards
+3. Set up alerting for critical metrics
+
+### Security Enhancements
+1. Enable SSL/TLS (Puter provides this automatically)
+2. Configure security headers
+3. Set up rate limiting
+4. Enable request logging
+
+## 🎯 Production Checklist
+
+- [ ] All environment variables configured
+- [ ] Database migrations completed
+- [ ] All services deployed and healthy
+- [ ] Domain configured and accessible
+- [ ] SSL/TLS enabled
+- [ ] Monitoring configured
+- [ ] Backup strategy in place
+- [ ] Error tracking (Sentry) configured
+- [ ] Rate limiting enabled
+- [ ] Security audit completed
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+**Service won't start:**
+- Check logs in Puter.com dashboard
+- Verify environment variables are correct
+- Ensure database and Redis are accessible
+
+**Database connection errors:**
+- Verify DATABASE_URL is correct
+- Check database is running
+- Test connectivity from Puter terminal
+
+**API errors:**
+- Check service logs
+- Verify service-to-service communication
+- Check CORS configuration
+
+## 📊 Monitoring
+
+Access monitoring at:
+- Puter Dashboard: Built-in metrics
+- Prometheus: `https://allamni.puter.com/metrics`
+- Grafana: Configure via Puter dashboard
+
+## 🔄 Updates and Maintenance
+
+### Update Process
+1. Push changes to GitHub
+2. In Puter.com, click "Redeploy"
+3. Monitor deployment logs
+4. Test critical functionality
+
+### Backup Strategy
+- Enable automatic daily backups in Puter.com
+- Test backup restoration regularly
+- Keep backup of environment variables
+
+## 📞 Support
+
+For Puter.com specific issues:
+- Puter Documentation: https://docs.puter.com
+- Puter Support: support@puter.com
+
+For Allamni specific issues:
+- GitHub Issues: https://github.com/Osama-SysEng/Allamni-Apex-/issues
 
 ## Environment Variables
 

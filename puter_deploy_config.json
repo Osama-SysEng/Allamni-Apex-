@@ -1,0 +1,116 @@
+{
+  "project": {
+    "name": "allamni-v4",
+    "description": "Allamni v4.0 - AI-Native Education Operating System",
+    "version": "4.0.0",
+    "runtime": "python-3.11"
+  },
+  "services": {
+    "api-gateway": {
+      "name": "api-gateway",
+      "build": "./backend/api_gateway",
+      "port": 8000,
+      "env": [
+        "AUTH_URL",
+        "LEARNING_URL", 
+        "AI_URL",
+        "INTEGRATION_URL",
+        "INSTITUTION_URL",
+        "CORS_ALLOWED_ORIGINS"
+      ],
+      "scaling": {
+        "min_instances": 1,
+        "max_instances": 3,
+        "target_cpu": 70
+      }
+    },
+    "auth-service": {
+      "name": "auth-service",
+      "build": "./backend/services/auth-service",
+      "port": 8001,
+      "env": [
+        "DATABASE_URL",
+        "REDIS_URL",
+        "JWT_SECRET_KEY",
+        "JWT_ACCESS_MINUTES",
+        "JWT_REFRESH_DAYS"
+      ],
+      "scaling": {
+        "min_instances": 1,
+        "max_instances": 2,
+        "target_cpu": 60
+      }
+    },
+    "ai-service": {
+      "name": "ai-service",
+      "build": "./backend/services/ai-service",
+      "port": 8003,
+      "env": [
+        "AI_PROVIDER",
+        "GEMINI_API_KEY",
+        "GEMINI_MODEL",
+        "DATABASE_URL"
+      ],
+      "scaling": {
+        "min_instances": 1,
+        "max_instances": 2,
+        "target_cpu": 80
+      }
+    },
+    "institution-service": {
+      "name": "institution-service",
+      "build": "./backend/services/institution-service",
+      "port": 8005,
+      "env": [
+        "DATABASE_URL",
+        "REDIS_URL"
+      ],
+      "scaling": {
+        "min_instances": 1,
+        "max_instances": 2,
+        "target_cpu": 60
+      }
+    }
+  },
+  "databases": [
+    {
+      "type": "postgresql",
+      "name": "allamni-db",
+      "size": "small",
+      "version": "15"
+    }
+  ],
+  "caches": [
+    {
+      "type": "redis",
+      "name": "allamni-cache",
+      "size": "small"
+    }
+  ],
+  "environment_variables": {
+    "DATABASE_URL": "postgresql://puter_user:puter_password@postgres-host:5432/allamni",
+    "REDIS_URL": "redis://redis-host:6379",
+    "AI_PROVIDER": "mock",
+    "GEMINI_API_KEY": "",
+    "GEMINI_MODEL": "gemini-1.5-pro",
+    "JWT_SECRET_KEY": "your_jwt_secret_key_change_in_production",
+    "JWT_ACCESS_MINUTES": "30",
+    "JWT_REFRESH_DAYS": "7",
+    "AUTH_URL": "http://auth-service:8001",
+    "LEARNING_URL": "http://learning-service:8002",
+    "AI_URL": "http://ai-service:8003",
+    "INTEGRATION_URL": "http://integration-service:8004",
+    "INSTITUTION_URL": "http://institution-service:8005",
+    "CORS_ALLOWED_ORIGINS": "https://allamni.puter.com",
+    "LOG_LEVEL": "info"
+  },
+  "domains": {
+    "primary": "allamni.puter.com",
+    "custom": ""
+  },
+  "monitoring": {
+    "enabled": true,
+    "prometheus": true,
+    "grafana": true
+  }
+}
