@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Allamni v4.0 - API Test Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .status-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            border-left: 5px solid #667eea;
+        }
+        .status-card.running {
+            border-left-color: #28a745;
+        }
+        .status-card.offline {
+            border-left-color: #dc3545;
+        }
+        .status-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .status-url {
+            color: #666;
+            font-size: 0.9em;
+            word-break: break-all;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-left: 10px;
+        }
+        .status-indicator.green {
+            background: #28a745;
+        }
+        .status-indicator.red {
+            background: #dc3545;
+        }
+        .test-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        .test-title {
+            color: #667eea;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .response-area {
+            background: #2d3748;
+            color: #a0aec0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .response-area.success {
+            border: 2px solid #28a745;
+        }
+        .response-area.error {
+            border: 2px solid #dc3545;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            background: #e0e0e0;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Allamni v4.0 - واجهة اختبار API</h1>
+        
+        <div class="status-grid">
+            <div class="status-card" id="gateway-status">
+                <div class="status-title">
+                    API Gateway
+                    <span class="status-indicator" id="gateway-indicator"></span>
+                </div>
+                <div class="status-url">http://localhost:8000</div>
+            </div>
+            <div class="status-card" id="auth-status">
+                <div class="status-title">
+                    Auth Service
+                    <span class="status-indicator" id="auth-indicator"></span>
+                </div>
+                <div class="status-url">http://localhost:8001</div>
+            </div>
+            <div class="status-card" id="ai-status">
+                <div class="status-title">
+                    AI Service
+                    <span class="status-indicator" id="ai-indicator"></span>
+                </div>
+                <div class="status-url">http://localhost:8003</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('auth')">المصادقة</button>
+            <button class="tab" onclick="showTab('chatbot')">الشات بوت</button>
+            <button class="tab" onclick="showTab('health')">فحص الصحة</button>
+        </div>
+
+        <div id="auth-tab" class="tab-content active">
+            <div class="test-section">
+                <div class="test-title">📝 تسجيل مستخدم جديد</div>
+                <div class="form-group">
+                    <label>البريد الإلكتروني</label>
+                    <input type="email" id="reg-email" value="test@example.com">
+                </div>
+                <div class="form-group">
+                    <label>كلمة المرور</label>
+                    <input type="password" id="reg-password" value="password123">
+                </div>
+                <div class="form-group">
+                    <label>الاسم الكامل</label>
+                    <input type="text" id="reg-name" value="مستخدم تجريبي">
+                </div>
+                <div class="form-group">
+                    <label>الدور</label>
+                    <input type="text" id="reg-role" value="student">
+                </div>
+                <button onclick="registerUser()">تسجيل</button>
+                <div class="response-area" id="reg-response"></div>
+            </div>
+
+            <div class="test-section">
+                <div class="test-title">🔐 تسجيل الدخول</div>
+                <div class="form-group">
+                    <label>البريد الإلكتروني</label>
+                    <input type="email" id="login-email" value="test@example.com">
+                </div>
+                <div class="form-group">
+                    <label>كلمة المرور</label>
+                    <input type="password" id="login-password" value="password123">
+                </div>
+                <button onclick="loginUser()">تسجيل الدخول</button>
+                <div class="response-area" id="login-response"></div>
+            </div>
+        </div>
+
+        <div id="chatbot-tab" class="tab-content">
+            <div class="test-section">
+                <div class="test-title">🤖 بدء محادثة مع الشات بوت</div>
+                <div class="form-group">
+                    <label>معرف المستخدم (User ID)</label>
+                    <input type="text" id="chat-user-id" value="">
+                </div>
+                <div class="form-group">
+                    <label>نوع السياق</label>
+                    <input type="text" id="chat-context" value="learning">
+                </div>
+                <div class="form-group">
+                    <label>الموضوع</label>
+                    <input type="text" id="chat-topic" value="python_basics">
+                </div>
+                <div class="form-group">
+                    <label>اللهجة</label>
+                    <input type="text" id="chat-dialect" value="egyptian">
+                </div>
+                <div class="form-group">
+                    <label>شخصية AI</label>
+                    <input type="text" id="chat-personality" value="friendly_tutor">
+                </div>
+                <button onclick="startChat()">بدء المحادثة</button>
+                <div class="response-area" id="chat-start-response"></div>
+            </div>
+
+            <div class="test-section">
+                <div class="test-title">💬 إرسال رسالة للشات بوت</div>
+                <div class="form-group">
+                    <label>معرف المحادثة (Conversation ID)</label>
+                    <input type="text" id="chat-conversation-id" value="">
+                </div>
+                <div class="form-group">
+                    <label>الرسالة</label>
+                    <textarea id="chat-message" rows="3" placeholder="اكتب رسالتك هنا...">شرح لي المتغيرات في بايثون</textarea>
+                </div>
+                <button onclick="sendMessage()">إرسال</button>
+                <div class="response-area" id="chat-message-response"></div>
+            </div>
+        </div>
+
+        <div id="health-tab" class="tab-content">
+            <div class="test-section">
+                <div class="test-title">🏥 فحص صحة الخدمات</div>
+                <button onclick="checkHealth()">فحص جميع الخدمات</button>
+                <div class="response-area" id="health-response"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = '';
+
+        async function checkHealth() {
+            const responseDiv = document.getElementById('health-response');
+            responseDiv.innerHTML = '<div class="loading">جاري الفحص</div>';
+            
+            try {
+                const responses = await Promise.all([
+                    fetch('http://localhost:8000/health'),
+                    fetch('http://localhost:8001/health'),
+                    fetch('http://localhost:8003/health')
+                ]);
+
+                const results = await Promise.all(responses.map(r => r.json()));
+                
+                responseDiv.innerHTML = `
+                    <div style="color: #28a745;">✅ API Gateway: ${JSON.stringify(results[0], null, 2)}</div>
+                    <div style="color: #28a745;">✅ Auth Service: ${JSON.stringify(results[1], null, 2)}</div>
+                    <div style="color: #28a745;">✅ AI Service: ${JSON.stringify(results[2], null, 2)}</div>
+                `;
+                responseDiv.classList.add('success');
+            } catch (error) {
+                responseDiv.innerHTML = `<div style="color: #dc3545;">❌ خطأ: ${error.message}</div>`;
+                responseDiv.classList.add('error');
+            }
+        }
+
+        async function registerUser() {
+            const responseDiv = document.getElementById('reg-response');
+            responseDiv.innerHTML = '<div class="loading">جاري التسجيل</div>';
+            
+            const data = {
+                email: document.getElementById('reg-email').value,
+                password: document.getElementById('reg-password').value,
+                full_name: document.getElementById('reg-name').value,
+                role: document.getElementById('reg-role').value
+            };
+
+            try {
+                const response = await fetch('http://localhost:8001/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                responseDiv.innerHTML = JSON.stringify(result, null, 2);
+                responseDiv.classList.add('success');
+                
+                if (result.access_token) {
+                    authToken = result.access_token;
+                    document.getElementById('chat-user-id').value = result.user.id;
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `<div style="color: #dc3545;">❌ خطأ: ${error.message}</div>`;
+                responseDiv.classList.add('error');
+            }
+        }
+
+        async function loginUser() {
+            const responseDiv = document.getElementById('login-response');
+            responseDiv.innerHTML = '<div class="loading">جاري تسجيل الدخول</div>';
+            
+            const data = {
+                email: document.getElementById('login-email').value,
+                password: document.getElementById('login-password').value
+            };
+
+            try {
+                const response = await fetch('http://localhost:8001/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                responseDiv.innerHTML = JSON.stringify(result, null, 2);
+                responseDiv.classList.add('success');
+                
+                if (result.access_token) {
+                    authToken = result.access_token;
+                    document.getElementById('chat-user-id').value = result.user.id;
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `<div style="color: #dc3545;">❌ خطأ: ${error.message}</div>`;
+                responseDiv.classList.add('error');
+            }
+        }
+
+        async function startChat() {
+            const responseDiv = document.getElementById('chat-start-response');
+            responseDiv.innerHTML = '<div class="loading">جاري بدء المحادثة</div>';
+            
+            const data = {
+                user_id: document.getElementById('chat-user-id').value,
+                context_type: document.getElementById('chat-context').value,
+                topic: document.getElementById('chat-topic').value,
+                dialect: document.getElementById('chat-dialect').value,
+                personality: document.getElementById('chat-personality').value,
+                skill_codes: ['variables'],
+                user_level: 0.5
+            };
+
+            try {
+                const response = await fetch('http://localhost:8003/chatbot/start', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                responseDiv.innerHTML = JSON.stringify(result, null, 2);
+                responseDiv.classList.add('success');
+                
+                if (result.conversation_id) {
+                    document.getElementById('chat-conversation-id').value = result.conversation_id;
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `<div style="color: #dc3545;">❌ خطأ: ${error.message}</div>`;
+                responseDiv.classList.add('error');
+            }
+        }
+
+        async function sendMessage() {
+            const responseDiv = document.getElementById('chat-message-response');
+            responseDiv.innerHTML = '<div class="loading">جاري إرسال الرسالة</div>';
+            
+            const data = {
+                conversation_id: document.getElementById('chat-conversation-id').value,
+                user_message: document.getElementById('chat-message').value
+            };
+
+            try {
+                const response = await fetch('http://localhost:8003/chatbot/message', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                responseDiv.innerHTML = JSON.stringify(result, null, 2);
+                responseDiv.classList.add('success');
+            } catch (error) {
+                responseDiv.innerHTML = `<div style="color: #dc3545;">❌ خطأ: ${error.message}</div>`;
+                responseDiv.classList.add('error');
+            }
+        }
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        }
+
+        // Check service status on load
+        async function checkServiceStatus() {
+            const services = [
+                { name: 'gateway', url: 'http://localhost:8000/health' },
+                { name: 'auth', url: 'http://localhost:8001/health' },
+                { name: 'ai', url: 'http://localhost:8003/health' }
+            ];
+
+            for (const service of services) {
+                try {
+                    const response = await fetch(service.url);
+                    const statusCard = document.getElementById(`${service.name}-status`);
+                    const indicator = document.getElementById(`${service.name}-indicator`);
+                    
+                    if (response.ok) {
+                        statusCard.classList.add('running');
+                        indicator.classList.add('green');
+                    } else {
+                        statusCard.classList.add('offline');
+                        indicator.classList.add('red');
+                    }
+                } catch (error) {
+                    const statusCard = document.getElementById(`${service.name}-status`);
+                    const indicator = document.getElementById(`${service.name}-indicator`);
+                    statusCard.classList.add('offline');
+                    indicator.classList.add('red');
+                }
+            }
+        }
+
+        // Initialize
+        checkServiceStatus();
+    </script>
+</body>
+</html>

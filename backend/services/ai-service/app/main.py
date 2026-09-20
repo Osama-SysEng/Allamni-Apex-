@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from uuid import uuid4
 from datetime import datetime, timezone
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 from shared.security import decode_token
 from shared.store import store
 from shared.intelligence import AgentOrchestrator, cognitive_snapshot, risk_score
@@ -20,7 +22,7 @@ app=FastAPI(title="Allamni AI Service", version="4.0.0")
 orchestrator=AgentOrchestrator()
 
 # Initialize AI provider based on configuration
-provider_type = AIProviderType(os.getenv("AI_PROVIDER", "mock"))
+provider_type = AIProviderType(os.getenv("AI_PROVIDER", "gemini"))
 try:
     ai_provider = get_ai_provider(
         provider_type=provider_type,
@@ -28,8 +30,24 @@ try:
         model=os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
     )
 except Exception as e:
-    print(f"Warning: Could not initialize AI provider: {e}. Using mock provider.")
-    ai_provider = get_ai_provider(AIProviderType.MOCK)
+    print(f"Error: Could not initialize AI provider: {e}")
+    ai_provider = None
+
+@app.on_event("startup")
+async def startup_validation():
+    """Validate AI provider on startup — fail fast if not configured"""
+    provider_type = AIProviderType(os.getenv("AI_PROVIDER", "gemini"))
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+    
+    if not api_key and os.getenv("ENVIRONMENT", "production") == "production":
+        raise RuntimeError(
+            "No AI API key configured. "
+            "Set GEMINI_API_KEY in your .env file. "
+            "Get it from: https://aistudio.google.com/app/apikey"
+        )
+    
+    print(f"✅ AI Service started with provider: {provider_type}")
+    print(f"✅ Model: {os.getenv('GEMINI_MODEL', 'gemini-1.5-pro')}")
 
 class AnalyzeRequest(BaseModel): student_id:str
 class GenerateRequest(BaseModel): student_id:str; prompt:str="Create adaptive learning material"; context:dict={}
@@ -348,13 +366,13 @@ async def send_chatbot_message(body: ChatbotMessageRequest, authorization: str =
     
     chatbot = get_powerful_ai_chatbot(store)
     
-    response = chatbot.send_message(
+    response = await chatbot.send_message(
         conversation_id=body.conversation_id,
         user_message=body.user_message,
         additional_context=body.additional_context
     )
     
-    return response.model_dump()
+    return response.to_dict()
 
 @app.get("/chatbot/conversation/{conversation_id}")
 async def get_chatbot_conversation(conversation_id: str, authorization: str = Header("")):

@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Any
 from enum import Enum
 import json
 import hashlib
+import asyncio
 
 class ConversationContext(str, Enum):
     """Conversation context types"""
@@ -124,6 +125,19 @@ class AIResponse:
     difficulty_level: Optional[str] = None
     estimated_time: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            'content': self.content,
+            'confidence': self.confidence,
+            'sources': self.sources,
+            'related_topics': self.related_topics,
+            'follow_up_questions': self.follow_up_questions,
+            'difficulty_level': self.difficulty_level,
+            'estimated_time': self.estimated_time,
+            'metadata': self.metadata
+        }
 
 class PowerfulAIChatbot:
     """Powerful AI chatbot with memory and context awareness"""
@@ -222,7 +236,7 @@ class PowerfulAIChatbot:
         
         return conversation_id
     
-    def send_message(self, conversation_id: str, user_message: str, 
+    async def send_message(self, conversation_id: str, user_message: str, 
                     additional_context: Dict[str, Any] = None) -> AIResponse:
         """Send user message and get AI response"""
         thread = self.store.conversation_threads.get(conversation_id)
@@ -247,7 +261,7 @@ class PowerfulAIChatbot:
         self.store.conversation_analytics['total_messages'] = self.store.conversation_analytics.get('total_messages', 0) + 1
         
         # Generate AI response
-        response = self._generate_ai_response(thread, user_message)
+        response = await self._generate_ai_response(thread, user_message)
         
         # Add assistant message
         assistant_msg = ConversationMessage(
@@ -269,7 +283,7 @@ class PowerfulAIChatbot:
         
         return response
     
-    def _generate_ai_response(self, thread: ConversationThread, user_message: str) -> AIResponse:
+    async def _generate_ai_response(self, thread: ConversationThread, user_message: str) -> AIResponse:
         """Generate AI response based on context and memory"""
         # Get conversation context
         context_window = thread.get_context_window()
@@ -295,21 +309,43 @@ class PowerfulAIChatbot:
             'context_type': thread.memory.context_type.value
         }
         
-        # Call AI provider (or use mock for demo)
-        if self.ai_provider:
-            try:
-                ai_response = self.ai_provider.generate(user_message, full_context)
-                response_content = ai_response.model_dump() if hasattr(ai_response, 'model_dump') else str(ai_response)
-            except Exception as e:
-                response_content = f"AI Error: {str(e)}"
-        else:
-            # Use enhanced mock response
+        # Build messages for AI
+        messages = [AIMessage(role=MessageRole.SYSTEM, content=system_prompt)]
+        
+        # Add conversation history (last 10 messages)
+        for msg in conversation_history[-10:]:
+            messages.append(AIMessage(
+                role=MessageRole.USER if msg.role == "user" else MessageRole.ASSISTANT,
+                content=msg.content
+            ))
+        
+        # Add current message
+        messages.append(AIMessage(role=MessageRole.USER, content=user_message))
+        
+        # Get real AI response
+        try:
+            from shared.ai_providers import get_ai_provider, AIProviderType
+            import os
+            
+            provider = get_ai_provider(
+                provider_type=AIProviderType(os.getenv("AI_PROVIDER", "gemini")),
+                api_key=os.getenv("GEMINI_API_KEY"),
+                model=os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
+            )
+            
+            ai_response = await provider.chat(messages, full_context)
+            response_content = ai_response.content
+            confidence = 0.9  # High confidence for real AI
+        except Exception as e:
+            # Fallback to enhanced mock if AI fails
+            print(f"AI provider error: {e}. Using fallback response.")
             response_content = self._generate_mock_response(thread, user_message, full_context)
+            confidence = 0.7
         
         # Create AI response object
         response = AIResponse(
             content=response_content,
-            confidence=0.85,
+            confidence=confidence,
             sources=self._extract_sources(relevant_knowledge),
             related_topics=self._extract_related_topics(thread.memory.topic),
             follow_up_questions=self._generate_follow_up_questions(thread.memory.topic),

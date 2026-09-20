@@ -7,6 +7,8 @@ from typing import Dict, List, Optional, Tuple
 from enum import Enum
 import re
 from datetime import datetime, timezone
+import json
+import os
 
 class ArabicDialect(str, Enum):
     """Arabic dialects supported by the system"""
@@ -293,3 +295,47 @@ class ArabicNLPProcessor:
 def get_arabic_nlp_processor() -> ArabicNLPProcessor:
     """Get Arabic NLP processor instance"""
     return ArabicNLPProcessor()
+
+
+async def process_arabic_input(text: str, dialect: ArabicDialect = None) -> dict:
+    """Process Arabic input with real dialect detection using Gemini"""
+    from shared.ai_providers import get_ai_provider, AIProviderType
+    
+    provider = get_ai_provider(
+        provider_type=AIProviderType.GEMINI,
+        api_key=os.getenv("GEMINI_API_KEY"),
+        model="gemini-1.5-flash"  # Flash for fast dialect detection
+    )
+    
+    prompt = f"""
+Analyze this Arabic text and respond in JSON format:
+Text: "{text}"
+
+Return JSON with these exact keys:
+- dialect: (egyptian/gulf/levantine/maghrebi/iraqi/modern_standard)
+- intent: (question/request/greeting/complaint/other)
+- sentiment: (positive/negative/neutral)
+- cleaned_text: normalized Arabic text
+- language_confidence: (0.0 to 1.0)
+- key_terms: list of important terms found
+- complexity: (simple/intermediate/advanced)
+"""
+    
+    try:
+        response = await provider.generate(prompt)
+        result = json.loads(response.content)
+        return result
+    except Exception as e:
+        # Fallback to rule-based processing if AI fails
+        print(f"AI dialect detection failed: {e}. Using rule-based fallback.")
+        processor = get_arabic_nlp_processor()
+        analysis = processor.process_text(text, dialect)
+        return {
+            'dialect': analysis.detected_dialect.value,
+            'intent': 'other',
+            'sentiment': analysis.sentiment,
+            'cleaned_text': text,
+            'language_confidence': analysis.confidence,
+            'key_terms': analysis.key_terms,
+            'complexity': analysis.complexity.value
+        }

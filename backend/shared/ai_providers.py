@@ -234,26 +234,44 @@ class GeminiAIProvider(BaseAIProvider):
             "system_instruction": "أنت محلل تعليمي خبير. تحلل البيانات وتقدم توصيات عملية باللغة العربية."
         })
 
-def get_ai_provider(provider_type: AIProviderType = AIProviderType.MOCK, **kwargs) -> BaseAIProvider:
-    """Factory function to get AI provider instance"""
+def get_ai_provider(
+    provider_type: AIProviderType = AIProviderType.GEMINI,
+    api_key: str = None,
+    model: str = "gemini-1.5-pro"
+) -> BaseAIProvider:
+    """Factory function — returns real provider, never mock in production"""
     
-    if provider_type == AIProviderType.MOCK:
-        return MockAIProvider()
-    
-    elif provider_type == AIProviderType.GEMINI:
-        api_key = kwargs.get('api_key') or os.getenv('GEMINI_API_KEY')
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY is required for Gemini provider")
-        model = kwargs.get('model', 'gemini-1.5-pro')
-        return GeminiAIProvider(api_key=api_key, model=model)
+    if provider_type == AIProviderType.GEMINI:
+        key = api_key or os.getenv("GEMINI_API_KEY")
+        if not key:
+            raise ValueError(
+                "GEMINI_API_KEY required. Set it in .env file. "
+                "Get your key from: https://aistudio.google.com/app/apikey"
+            )
+        return GeminiAIProvider(api_key=key, model=model)
     
     elif provider_type == AIProviderType.OPENAI:
+        key = api_key or os.getenv("OPENAI_API_KEY")
+        if not key:
+            raise ValueError("OPENAI_API_KEY required.")
         # TODO: Implement OpenAI provider
         raise NotImplementedError("OpenAI provider not yet implemented")
     
     elif provider_type == AIProviderType.ANTHROPIC:
+        key = api_key or os.getenv("ANTHROPIC_API_KEY")
+        if not key:
+            raise ValueError("ANTHROPIC_API_KEY required.")
         # TODO: Implement Anthropic provider
         raise NotImplementedError("Anthropic provider not yet implemented")
     
-    else:
-        raise ValueError(f"Unknown provider type: {provider_type}")
+    # Only allow mock in explicit test environments
+    elif provider_type == AIProviderType.MOCK:
+        env = os.getenv("ENVIRONMENT", "production")
+        if env not in ["test", "development"]:
+            raise ValueError(
+                "MockAIProvider not allowed in production. "
+                "Set ENVIRONMENT=test or provide a real API key."
+            )
+        return MockAIProvider()
+    
+    raise ValueError(f"Unknown provider type: {provider_type}")

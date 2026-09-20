@@ -1,7 +1,9 @@
 from uuid import uuid4
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import List, Optional, Dict
 from enum import Enum
+import os
+import httpx
 
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
@@ -10,6 +12,122 @@ from shared.config.settings import settings
 from shared.identity import active_session, audit
 from shared.security import decode_token
 from shared.store import store
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
+
+
+class OdooClient:
+    """Real Odoo API client for production integration"""
+    
+    def __init__(self):
+        self.url = os.getenv("ODOO_URL", settings.odoo_url)
+        self.db = os.getenv("ODOO_DB", settings.odoo_db)
+        self.username = os.getenv("ODOO_USERNAME", settings.odoo_username)
+        self.password = os.getenv("ODOO_PASSWORD", settings.odoo_password)
+        self._uid = None
+    
+    async def authenticate(self) -> int:
+        """Authenticate with Odoo and get user ID"""
+        if not all([self.url, self.db, self.username, self.password]):
+            raise ValueError("Odoo credentials not configured. Set ODOO_URL, ODOO_DB, ODOO_USERNAME, ODOO_PASSWORD in .env")
+        
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{self.url}/web/dataset/call_kw",
+                json={
+                    "jsonrpc": "2.0", "method": "call",
+                    "params": {
+                        "service": "common", "method": "authenticate",
+                        "args": [self.db, self.username, self.password, {}]
+                    }
+                }
+            )
+            r.raise_for_status()
+            self._uid = r.json()["result"]
+            return self._uid
+    
+    async def sync_student(self, student_data: dict) -> dict:
+        """Sync student data to Odoo"""
+        uid = self._uid or await self.authenticate()
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{self.url}/web/dataset/call_kw",
+                json={
+                    "jsonrpc": "2.0", "method": "call",
+                    "params": {
+                        "service": "object", "method": "execute_kw",
+                        "args": [
+                            self.db, uid, self.password,
+                            "res.partner", "create",
+                            [{
+                                "name": student_data.get("full_name", student_data.get("name", "")),
+                                "email": student_data.get("email", ""),
+                                "phone": student_data.get("phone", ""),
+                                "comment": f"Allamni Student ID: {student_data.get('id', '')}"
+                            }]
+                        ]
+                    }
+                }
+            )
+            r.raise_for_status()
+            return r.json()["result"]
+    
+    async def sync_teacher(self, teacher_data: dict) -> dict:
+        """Sync teacher data to Odoo"""
+        uid = self._uid or await self.authenticate()
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{self.url}/web/dataset/call_kw",
+                json={
+                    "jsonrpc": "2.0", "method": "call",
+                    "params": {
+                        "service": "object", "method": "execute_kw",
+                        "args": [
+                            self.db, uid, self.password,
+                            "res.partner", "create",
+                            [{
+                                "name": teacher_data.get("full_name", teacher_data.get("name", "")),
+                                "email": teacher_data.get("email", ""),
+                                "phone": teacher_data.get("phone", ""),
+                                "comment": f"Allamni Teacher ID: {teacher_data.get('id', '')}"
+                            }]
+                        ]
+                    }
+                }
+            )
+            r.raise_for_status()
+            return r.json()["result"]
+    
+    async def sync_institution(self, institution_data: dict) -> dict:
+        """Sync institution data to Odoo"""
+        uid = self._uid or await self.authenticate()
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{self.url}/web/dataset/call_kw",
+                json={
+                    "jsonrpc": "2.0", "method": "call",
+                    "params": {
+                        "service": "object", "method": "execute_kw",
+                        "args": [
+                            self.db, uid, self.password,
+                            "res.partner", "create",
+                            [{
+                                "name": institution_data.get("name", ""),
+                                "email": institution_data.get("email", ""),
+                                "is_company": True,
+                                "comment": f"Allamni Institution ID: {institution_data.get('id', '')}"
+                            }]
+                        ]
+                    }
+                }
+            )
+            r.raise_for_status()
+            return r.json()["result"]
+
+
+# Initialize Odoo client
+odoo_client = OdooClient()
 
 
 class SyncDirection(str, Enum):
@@ -104,7 +222,7 @@ def queue(body: SyncEvent, authorization: str = Header('')):
 # Enhanced Odoo Integration Endpoints
 
 @app.post('/odoo/sync/entity')
-def sync_entity(body: OdooSyncRequest, authorization: str = Header('')):
+async def sync_entity(body: OdooSyncRequest, authorization: str = Header('')):
     """Sync a single entity with Odoo"""
     claims = admin(authorization)
     
@@ -138,13 +256,20 @@ def sync_entity(body: OdooSyncRequest, authorization: str = Header('')):
         'odoo_config': odoo_config
     }
     
-    # In production, this would make actual API calls to Odoo
-    # For now, we simulate the sync
+    # In production, make actual API calls to Odoo
     try:
-        # Simulate sync processing
+        if body.entity_type == EntityType.STUDENT:
+            odoo_external_id = await odoo_client.sync_student(entity_data)
+        elif body.entity_type == EntityType.TEACHER:
+            odoo_external_id = await odoo_client.sync_teacher(entity_data)
+        elif body.entity_type == EntityType.INSTITUTION:
+            odoo_external_id = await odoo_client.sync_institution(entity_data)
+        else:
+            odoo_external_id = f"odoo_{body.entity_type.value}_{body.entity_id}"
+        
         sync_event['status'] = SyncStatus.COMPLETED.value
         sync_event['processed_at'] = datetime.now(timezone.utc).isoformat()
-        sync_event['odoo_external_id'] = f"odoo_{body.entity_type.value}_{body.entity_id}"
+        sync_event['odoo_external_id'] = odoo_external_id
         
         audit(claims['sub'], 'ENTITY_SYNC_COMPLETED', body.entity_type.value, body.entity_id, {
             'direction': body.direction.value,
@@ -169,7 +294,7 @@ def sync_entity(body: OdooSyncRequest, authorization: str = Header('')):
 
 
 @app.post('/odoo/sync/bulk')
-def bulk_sync(body: BulkSyncRequest, authorization: str = Header('')):
+async def bulk_sync(body: BulkSyncRequest, authorization: str = Header('')):
     """Bulk sync entities for an institution"""
     claims = admin(authorization)
     
@@ -216,10 +341,19 @@ def bulk_sync(body: BulkSyncRequest, authorization: str = Header('')):
                 'created_at': datetime.now(timezone.utc).isoformat()
             }
             
-            # Simulate sync
+            # Real Odoo sync
+            if body.entity_type == EntityType.STUDENT:
+                odoo_external_id = await odoo_client.sync_student(entity)
+            elif body.entity_type == EntityType.TEACHER:
+                odoo_external_id = await odoo_client.sync_teacher(entity)
+            elif body.entity_type == EntityType.INSTITUTION:
+                odoo_external_id = await odoo_client.sync_institution(entity)
+            else:
+                odoo_external_id = f"odoo_{body.entity_type.value}_{entity['id']}"
+            
             sync_event['status'] = SyncStatus.COMPLETED.value
             sync_event['processed_at'] = datetime.now(timezone.utc).isoformat()
-            sync_event['odoo_external_id'] = f"odoo_{body.entity_type.value}_{entity['id']}"
+            sync_event['odoo_external_id'] = odoo_external_id
             
             sync_results['successful'] += 1
             sync_results['results'].append({

@@ -2,6 +2,9 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 from uuid import uuid4
 from datetime import datetime, date, timezone
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 from shared.config.settings import settings
 from shared.identity import active_session, create_session, record_consent, revoke_session, rotate_refresh
 from shared.security import create_token, decode_token
@@ -472,9 +475,7 @@ def setup_2fa(authorization: str = Header('')):
     enhanced_auth = get_enhanced_auth_service(store)
     
     two_factor = enhanced_auth.setup_2fa(
-        user_id=claims['sub'],
-        method='sms',
-        contact_info=store.users[claims['sub']].get('phone', '')
+        user_id=claims['sub']
     )
     
     return {'status': '2fa_setup_initiated', 'method': two_factor.method, 'backup_codes': two_factor.backup_codes}
@@ -484,6 +485,11 @@ def verify_2fa(code: str, authorization: str = Header('')):
     """Verify two-factor authentication code"""
     claims = current(authorization)
     enhanced_auth = get_enhanced_auth_service(store)
+    
+    # First enable 2FA if not enabled
+    two_fa = enhanced_auth.store.two_factor_auths.get(claims['sub'])
+    if two_fa and not two_fa.is_enabled:
+        two_fa.is_enabled = True
     
     if enhanced_auth.verify_2fa(claims['sub'], code):
         return {'status': '2fa_verified'}
