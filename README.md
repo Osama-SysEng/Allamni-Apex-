@@ -69,3 +69,8 @@ python -m pytest -q
 
 ## Important
 Real LLM, Odoo, production database repositories, object storage and deployment credentials are environment-specific. Development fallback is deterministic and explicitly labeled; no fake integration is presented as production-live.
+
+## What's New (Oct 2026)
+- Live PostgreSQL (15 tables) + `.env.example`
+- 55 tests collected, 0 collection errors
+- Interactive 3D showcase: open `web-3d/index.html` (Three.js, animated, mouse-reactive)
