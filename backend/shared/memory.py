@@ -74,6 +74,12 @@ class LearningMemory:
                  importance: str = "medium", tags: List[str] = None, 
                  expires_days: int = None, metadata: Dict[str, Any] = None) -> str:
         """Store a memory item"""
+        if not user_id or not isinstance(user_id, str):
+            raise ValueError("user_id must be a non-empty string")
+        if not isinstance(content, dict) or not content:
+            raise ValueError("content must be a non-empty dict")
+        if expires_days is not None and expires_days <= 0:
+            raise ValueError("expires_days must be a positive integer")
         memory_id = str(uuid4())
         
         # Convert string enums to enum objects
@@ -124,6 +130,17 @@ class LearningMemory:
     def recall(self, user_id: str, memory_type: str = None, limit: int = 10, 
                 tags: List[str] = None, importance: str = None) -> List[Dict]:
         """Recall memories for a user"""
+        if not user_id or not isinstance(user_id, str):
+            raise ValueError("user_id must be a non-empty string")
+        # Clamp limit to a sane range (prevents unbounded reads)
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            raise ValueError("limit must be an integer")
+        limit = max(1, min(limit, 1000))
+        # Normalize enum-or-string memory_type to its plain string value
+        if memory_type is not None and isinstance(memory_type, Enum):
+            memory_type = memory_type.value
         # Get user's memory IDs
         user_memory_ids = self.user_indexes.get(user_id, [])
         
@@ -141,7 +158,11 @@ class LearningMemory:
         
         # Filter by importance if specified
         if importance:
-            importance_level = MemoryImportance(importance)
+            try:
+                importance_level = MemoryImportance(importance.value if isinstance(importance, Enum) else importance)
+            except ValueError:
+                valid = sorted(m.value for m in MemoryImportance)
+                raise ValueError(f"Invalid importance '{importance}'. Valid values: {valid}")
             user_memory_ids = [
                 mid for mid in user_memory_ids
                 if self.memories[mid].importance == importance_level
@@ -205,9 +226,14 @@ class LearningMemory:
         return True
     
     def search_semantic(self, user_id: str, query: str, limit: int = 5) -> List[Dict]:
-        """Search memories semantically (placeholder for vector search)"""
+        """Search memories by keyword match (rule-based fallback until vector search lands)."""
         # Placeholder implementation
         # In production, would use vector embeddings and similarity search
+        if not user_id or not isinstance(user_id, str):
+            raise ValueError("user_id must be a non-empty string")
+        if not query or not isinstance(query, str):
+            raise ValueError("query must be a non-empty string")
+        limit = max(1, min(int(limit), 100))
         
         user_memories = self.recall(user_id, limit=100)
         
@@ -278,21 +304,22 @@ class LearningMemory:
         return [memory.to_dict() for memory in self.memories.values()]
     
     def remember_legacy(self, subject_id: str, kind: str, content: dict[str, Any]) -> Dict:
-        """Backward compatibility: legacy remember method"""
-        return self.remember(subject_id, kind, content).to_dict()
-    
+        """Backward compatibility: legacy remember method (returns the stored memory dict)."""
+        memory_id = self.remember(subject_id, kind, content)
+        return self.memories[memory_id].to_dict()
+
     def recall_legacy(self, subject_id: str, kind: str = None, limit: int = 20) -> list[dict[str, Any]]:
         """Backward compatibility: legacy recall method"""
         # Convert to memory types
         kind_mapping = {
-            'conversation': MemoryType.CONVERSATION,
-            'assessment': MemoryType.ASSESSMENT,
-            'content_plan': MemoryType.CONTENT_PLAN,
-            'mistake': MemoryType.MISTAKE,
-            'preference': MemoryType.PREFERENCE,
-            'achievement': MemoryType.ACHIEVEMENT,
-            'question': MemoryType.QUESTION
+            'conversation': 'conversation',
+            'assessment': 'assessment',
+            'content_plan': 'content_plan',
+            'mistake': 'mistake',
+            'preference': 'preference',
+            'achievement': 'achievement',
+            'question': 'question'
         }
-        
+
         mapped_type = kind_mapping.get(kind) if kind else None
         return self.recall(subject_id, mapped_type, limit)

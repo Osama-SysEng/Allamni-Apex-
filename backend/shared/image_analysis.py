@@ -79,30 +79,25 @@ class ImageAnalyzer:
     
     def _init_ocr_engine(self):
         """Initialize OCR engine for text extraction"""
-        # In production, would initialize:
-        # - Tesseract OCR
-        # - Google Cloud Vision API
-        # - Azure Computer Vision
-        # - AWS Textract
-        pass
-    
+        # Rule-based stub: real OCR (Tesseract / Cloud Vision) needs credentials + user images.
+        self._ocr_ready = True
+
     def _init_object_detector(self):
         """Initialize object detection model"""
-        # In production, would initialize:
-        # - YOLO
-        # - Faster R-CNN
-        # - MobileNet
-        pass
-    
+        # Rule-based stub: real detection (YOLO etc.) needs model weights.
+        self._detector_ready = True
+
     def _init_math_parser(self):
         """Initialize mathematical equation parser"""
-        # In production, would initialize:
-        # - Mathpix API
-        # - Custom equation recognition model
-        pass
-    
+        # Rule-based stub: real parsing (Mathpix etc.) needs an API key.
+        self._math_parser_ready = True
+
     def analyze_image(self, image_data: str, image_type: ImageType, user_id: str = None) -> ImageAnalysis:
         """Analyze image and extract information"""
+        if not image_data or not isinstance(image_data, str):
+            raise ValueError("image_data must be a non-empty base64 string")
+        if not isinstance(image_type, ImageType):
+            raise ValueError(f"image_type must be an ImageType (got {image_type!r})")
         analysis_id = str(uuid4())
         
         # Detect content type
@@ -139,7 +134,8 @@ class ImageAnalyzer:
             suggestions=suggestions,
             metadata={
                 'processing_time': 2.5,
-                'model_used': 'placeholder_vision_model'
+                'model_used': 'rule_based_heuristics_v1',
+                'note': 'Heuristic stub: connect a vision model + user images for production OCR.'
             }
         )
         

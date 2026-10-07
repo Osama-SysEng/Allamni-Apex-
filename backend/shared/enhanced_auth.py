@@ -407,22 +407,35 @@ class EnhancedAuthService:
         lockout = self.store.account_lockouts.get(user_id)
         if not lockout:
             return False
-        
-        locked_until = datetime.fromisoformat(lockout['locked_until'])
+
+        try:
+            locked_until = datetime.fromisoformat(lockout['locked_until'])
+        except (KeyError, ValueError, TypeError):
+            # Corrupt lockout record: fail closed (treat as locked) is risky;
+            # drop the bad record and fail open with a clear state.
+            self.store.account_lockouts.pop(user_id, None)
+            return False
+        if locked_until.tzinfo is None:
+            locked_until = locked_until.replace(tzinfo=timezone.utc)
         if datetime.now(timezone.utc) > locked_until:
             # Lockout expired, remove it
             del self.store.account_lockouts[user_id]
             return False
-        
+
         return True
-    
+
     def get_remaining_lockout_time(self, user_id: str) -> Optional[timedelta]:
         """Get remaining lockout time"""
         lockout = self.store.account_lockouts.get(user_id)
         if not lockout:
             return None
-        
-        locked_until = datetime.fromisoformat(lockout['locked_until'])
+
+        try:
+            locked_until = datetime.fromisoformat(lockout['locked_until'])
+        except (KeyError, ValueError, TypeError):
+            return None
+        if locked_until.tzinfo is None:
+            locked_until = locked_until.replace(tzinfo=timezone.utc)
         remaining = locked_until - datetime.now(timezone.utc)
         
         return remaining if remaining.total_seconds() > 0 else None

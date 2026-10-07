@@ -253,16 +253,17 @@ def get_ai_provider(
     elif provider_type == AIProviderType.OPENAI:
         key = api_key or os.getenv("OPENAI_API_KEY")
         if not key:
-            raise ValueError("OPENAI_API_KEY required.")
-        # TODO: Implement OpenAI provider
-        raise NotImplementedError("OpenAI provider not yet implemented")
-    
+            raise ValueError("OPENAI_API_KEY required (set it in .env).")
+        # OpenAI provider is not implemented yet: Gemini is the only supported
+        # production provider. Add a provider class + wire it here (user input needed).
+        raise NotImplementedError("OpenAI provider not yet implemented — use AI_PROVIDER=gemini")
+
     elif provider_type == AIProviderType.ANTHROPIC:
         key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not key:
-            raise ValueError("ANTHROPIC_API_KEY required.")
-        # TODO: Implement Anthropic provider
-        raise NotImplementedError("Anthropic provider not yet implemented")
+            raise ValueError("ANTHROPIC_API_KEY required (set it in .env).")
+        # Anthropic provider is not implemented yet (same note as OpenAI above).
+        raise NotImplementedError("Anthropic provider not yet implemented — use AI_PROVIDER=gemini")
     
     # Only allow mock in explicit test environments
     elif provider_type == AIProviderType.MOCK:

@@ -84,17 +84,19 @@ class ArabicNLPProcessor:
     
     def _init_dialect_classifier(self):
         """Initialize dialect classification model"""
-        # In production, this would load a trained ML model
-        # For demo, we use rule-based classification
-        pass
-    
+        # Rule-based classifier (regex markers in DIALECT_MARKERS).
+        # A trained ML model can replace this in production without changing callers.
+        self._dialect_classifier_ready = True
+
     def _init_complexity_analyzer(self):
         """Initialize text complexity analyzer"""
-        # In production, this would use more sophisticated NLP
-        pass
-    
+        # Heuristic analyzer (word/sentence statistics in analyze_complexity).
+        self._complexity_analyzer_ready = True
+
     def detect_dialect(self, text: str) -> Tuple[ArabicDialect, float]:
         """Detect Arabic dialect from text"""
+        if not text or not isinstance(text, str) or not text.strip():
+            raise ValueError("text must be a non-empty string")
         text_lower = text.lower()
         
         dialect_scores = {}
@@ -227,6 +229,8 @@ class ArabicNLPProcessor:
     
     def process_text(self, text: str, target_dialect: Optional[ArabicDialect] = None) -> ArabicTextAnalysis:
         """Complete Arabic text processing pipeline"""
+        if not text or not isinstance(text, str) or not text.strip():
+            raise ValueError("text must be a non-empty string")
         # Detect dialect
         detected_dialect, confidence = self.detect_dialect(text)
         
@@ -262,11 +266,9 @@ class ArabicNLPProcessor:
         return analysis
     
     def adapt_to_dialect(self, text: str, target_dialect: ArabicDialect) -> str:
-        """Adapt text to target Arabic dialect"""
-        # Simplified dialect adaptation
-        # In production, would use translation models
-        
-        # This is a placeholder - real implementation would use ML models
+        """Adapt text to target Arabic dialect (rule-based tag; full translation needs an ML model + user content)."""
+        if not text or not isinstance(text, str) or not text.strip():
+            raise ValueError("text must be a non-empty string")
         adapted_text = text
         
         # Add note about dialect adaptation
@@ -277,6 +279,8 @@ class ArabicNLPProcessor:
     
     def tokenize_arabic(self, text: str) -> List[str]:
         """Tokenize Arabic text"""
+        if not text or not isinstance(text, str) or not text.strip():
+            raise ValueError("text must be a non-empty string")
         # Simplified Arabic tokenization
         # In production, would use proper Arabic tokenizer
         
@@ -288,6 +292,11 @@ class ArabicNLPProcessor:
     
     def get_reading_time(self, text: str, reading_speed: int = 200) -> int:
         """Estimate reading time in seconds"""
+        if not text or not isinstance(text, str) or not text.strip():
+            raise ValueError("text must be a non-empty string")
+        if not isinstance(reading_speed, int) or reading_speed <= 0:
+            raise ValueError("reading_speed must be a positive integer (words per minute)")
+        reading_speed = max(50, min(reading_speed, 1000))
         word_count = len(text.split())
         return max(1, (word_count * 60) // reading_speed)  # Convert to seconds
 
@@ -300,6 +309,9 @@ def get_arabic_nlp_processor() -> ArabicNLPProcessor:
 async def process_arabic_input(text: str, dialect: ArabicDialect = None) -> dict:
     """Process Arabic input with real dialect detection using Gemini"""
     from shared.ai_providers import get_ai_provider, AIProviderType
+
+    if not text or not isinstance(text, str) or not text.strip():
+        raise ValueError("text must be a non-empty string")
     
     provider = get_ai_provider(
         provider_type=AIProviderType.GEMINI,

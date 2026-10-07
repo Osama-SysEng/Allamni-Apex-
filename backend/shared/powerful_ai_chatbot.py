@@ -203,8 +203,21 @@ class PowerfulAIChatbot:
                           topic: str, dialect: str, personality: AIPersonality = AIPersonality.FRIENDLY_TUTOR,
                           skill_codes: List[str] = None, user_level: float = 0.5) -> str:
         """Start a new conversation thread"""
+        if not user_id or not isinstance(user_id, str):
+            raise ValueError("user_id must be a non-empty string")
+        if not topic or not isinstance(topic, str):
+            raise ValueError("topic must be a non-empty string")
+        if len(topic) > 500:
+            raise ValueError("topic must be at most 500 characters")
+        if not isinstance(context_type, ConversationContext):
+            raise ValueError(f"context_type must be a ConversationContext (got {context_type!r})")
+        try:
+            user_level = float(user_level)
+        except (TypeError, ValueError):
+            raise ValueError("user_level must be a number between 0 and 1")
+        user_level = max(0.0, min(1.0, user_level))
         conversation_id = str(uuid4())
-        
+
         # Create conversation memory
         memory = ConversationMemory(
             conversation_id=conversation_id,
@@ -239,6 +252,12 @@ class PowerfulAIChatbot:
     async def send_message(self, conversation_id: str, user_message: str, 
                     additional_context: Dict[str, Any] = None) -> AIResponse:
         """Send user message and get AI response"""
+        if not conversation_id or not isinstance(conversation_id, str):
+            raise ValueError("conversation_id must be a non-empty string")
+        if not user_message or not isinstance(user_message, str) or not user_message.strip():
+            raise ValueError("user_message must be a non-empty string")
+        if len(user_message) > 10000:
+            raise ValueError("user_message must be at most 10000 characters")
         thread = self.store.conversation_threads.get(conversation_id)
         if not thread:
             return AIResponse(
@@ -309,24 +328,26 @@ class PowerfulAIChatbot:
             'context_type': thread.memory.context_type.value
         }
         
-        # Build messages for AI
-        def _msg(role, content):
-            return ConversationMessage(
-                id=str(uuid4()),
-                conversation_id=thread.id,
-                role=role,
-                content=content,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        messages = [_msg(MessageRole.SYSTEM, system_prompt)]
+        # Build messages for AI (use provider-native message type, not the
+        # local ConversationMessage, so role comparison stays exact).
+        from shared.ai_providers import AIMessage as ProviderAIMessage
+        from shared.ai_providers import MessageRole as ProviderRole
+        _ROLE_MAP = {
+            MessageRole.USER: ProviderRole.USER,
+            MessageRole.ASSISTANT: ProviderRole.ASSISTANT,
+            MessageRole.SYSTEM: ProviderRole.SYSTEM,
+        }
+        messages = [ProviderAIMessage(role=ProviderRole.SYSTEM, content=system_prompt)]
 
         # Add conversation history (formatted string) as context
         if conversation_history:
-            messages.append(_msg(MessageRole.SYSTEM, f"Conversation so far:\n{conversation_history}"))
+            messages.append(ProviderAIMessage(
+                role=ProviderRole.SYSTEM,
+                content=f"Conversation so far:\n{conversation_history}",
+            ))
 
         # Add current message
-        messages.append(_msg(MessageRole.USER, user_message))
+        messages.append(ProviderAIMessage(role=ProviderRole.USER, content=user_message))
         
         # Get real AI response
         try:
@@ -343,7 +364,7 @@ class PowerfulAIChatbot:
             response_content = ai_response.content
             confidence = 0.9  # High confidence for real AI
         except Exception as e:
-            # Fallback to enhanced mock if AI fails
+            # Rule-based fallback when the live provider is unreachable/misconfigured.
             print(f"AI provider error: {e}. Using fallback response.")
             response_content = self._generate_mock_response(thread, user_message, full_context)
             confidence = 0.7

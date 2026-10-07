@@ -58,21 +58,19 @@ class VoiceInputProcessor:
     def __init__(self):
         # Initialize voice processing resources
         self._init_speech_recognizer()
-    
+
     def _init_speech_recognizer(self):
         """Initialize speech recognition engine"""
-        # In production, this would initialize:
-        # - Google Speech-to-Text
-        # - Azure Speech Services
-        # - Amazon Transcribe
-        # - Or open-source alternatives like Coqui STT
-        pass
-    
-    def transcribe_audio(self, audio_data: str, language: VoiceLanguage = VoiceLanguage.ARABIC, 
+        # Rule-based stub: real STT (Google/Azure/Transcribe) needs credentials + user audio.
+        self._recognizer_ready = True
+
+    def transcribe_audio(self, audio_data: str, language: VoiceLanguage = VoiceLanguage.ARABIC,
                          user_id: str = None) -> VoiceTranscription:
         """Transcribe audio data to text"""
-        # Placeholder implementation
-        # In production, this would call actual speech-to-text API
+        if not audio_data or not isinstance(audio_data, str):
+            raise ValueError("audio_data must be a non-empty base64 string")
+        if not isinstance(language, VoiceLanguage):
+            raise ValueError(f"language must be a VoiceLanguage (got {language!r})")
         
         transcription_id = str(uuid4())
         
@@ -102,17 +100,34 @@ class VoiceInputProcessor:
             detected_dialect=detected_dialect,
             metadata={
                 'processing_time': 1.2,
-                'model_used': 'placeholder_stt_model'
+                'model_used': 'rule_based_stt_stub_v1',
+                'note': 'Deterministic stub: connect an STT service + user audio for production.'
             }
         )
         
         return transcription
     
+    _LANGUAGE_ALIASES = {
+        'ar': 'ar', 'arabic': 'ar', 'arab': 'ar', 'العربية': 'ar',
+        'en': 'en', 'english': 'en', 'الإنجليزية': 'en',
+        'fr': 'fr', 'french': 'fr', 'الفرنسية': 'fr',
+        'de': 'de', 'german': 'de', 'الألمانية': 'de',
+    }
+
     def process_voice_command(self, audio_data: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """Process voice command with context"""
-        # Transcribe audio
-        language = context.get('language', 'arabic')
-        transcription = self.transcribe_audio(audio_data, VoiceLanguage(language))
+        if not audio_data or not isinstance(audio_data, str):
+            raise ValueError("audio_data must be a non-empty base64 string")
+        if not isinstance(context, dict):
+            raise ValueError("context must be a dict")
+        # Transcribe audio (accept 'ar' or 'arabic' style language labels)
+        raw_language = str(context.get('language', 'ar')).strip().lower()
+        lang_code = self._LANGUAGE_ALIASES.get(raw_language, 'ar')
+        try:
+            language = VoiceLanguage(lang_code)
+        except ValueError:
+            raise ValueError(f"Unsupported language '{raw_language}'. Supported: ar, en, fr, de.")
+        transcription = self.transcribe_audio(audio_data, language)
         
         # Analyze transcribed text for commands
         command = self._extract_command(transcription.transcribed_text, context)
@@ -228,6 +243,13 @@ class VoiceInteractionManager:
     
     def get_user_voice_history(self, user_id: str, limit: int = 10) -> List[Dict]:
         """Get voice interaction history for a user"""
+        if not user_id or not isinstance(user_id, str):
+            raise ValueError("user_id must be a non-empty string")
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            raise ValueError("limit must be an integer")
+        limit = max(1, min(limit, 100))
         user_sessions = [
             session for session in self.store.voice_sessions.values()
             if session['user_id'] == user_id
