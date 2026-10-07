@@ -70,9 +70,11 @@ def validate_student_code(code: str) -> dict | None:
             # Check if already used
             if code_info.get('student_id'):
                 return None
-            # Check expiration
+            # Check expiration (naive stored values are treated as UTC)
             if code_info.get('expires_at'):
                 expires_at = datetime.fromisoformat(code_info['expires_at'])
+                if expires_at.tzinfo is None:
+                    expires_at = expires_at.replace(tzinfo=timezone.utc)
                 if datetime.now(timezone.utc) > expires_at:
                     return None
             return code_info
@@ -85,9 +87,11 @@ def validate_teacher_code(code: str) -> dict | None:
             # Check if already used
             if code_info.get('teacher_id'):
                 return None
-            # Check expiration
+            # Check expiration (naive stored values are treated as UTC)
             if code_info.get('expires_at'):
                 expires_at = datetime.fromisoformat(code_info['expires_at'])
+                if expires_at.tzinfo is None:
+                    expires_at = expires_at.replace(tzinfo=timezone.utc)
                 if datetime.now(timezone.utc) > expires_at:
                     return None
             return code_info

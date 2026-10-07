@@ -4,6 +4,8 @@ Tests all three phases (1, 2, 3) together to verify complete system integration
 """
 import sys
 import os
+# Integration tests run against the deterministic mock provider (no live keys).
+os.environ.setdefault("AI_PROVIDER", "mock")
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from datetime import datetime, timezone, timedelta

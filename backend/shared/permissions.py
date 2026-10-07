@@ -149,9 +149,11 @@ def get_permissions_for_role(role: UserRole) -> List[Permission]:
 
 def has_permission(role: UserRole, resource: str, action: str, scope: str = "own") -> bool:
     """Check if a role has a specific permission"""
+    # `manage` implies all CRUD actions on the resource.
+    _IMPLIED_BY_MANAGE = {"create", "read", "edit", "delete", "view", "manage"}
     permissions = get_permissions_for_role(role)
     for perm in permissions:
-        if perm.resource == resource and perm.action == action:
+        if perm.resource == resource and (perm.action == action or (perm.action == "manage" and action in _IMPLIED_BY_MANAGE)):
             # Check scope hierarchy
             if scope == "own":
                 return True

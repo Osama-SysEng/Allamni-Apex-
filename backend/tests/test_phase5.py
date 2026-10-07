@@ -178,11 +178,12 @@ def test_powerful_ai_chatbot():
         print("[ERROR] Conversation start failed")
         return False
     
-    # Test message sending
-    response = chatbot.send_message(
+    # Test message sending (async API)
+    import asyncio as _asyncio
+    response = _asyncio.run(chatbot.send_message(
         conversation_id=conversation_id,
         user_message="شرح لي المتغيرات في بايثون"
-    )
+    ))
     
     if response.content and response.confidence > 0:
         # Truncate to avoid encoding issues with Arabic text

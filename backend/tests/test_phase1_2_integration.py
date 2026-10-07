@@ -5,6 +5,10 @@ Tests the complete integration of Phase 1 and Phase 2 features
 import sys
 import os
 
+# Tests use the deterministic mock provider (no live keys).
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("AI_PROVIDER", "mock")
+
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
@@ -27,7 +31,17 @@ from shared.billing import get_billing_service, InvoiceStatus, PaymentMethod
 def test_complete_integration():
     """Test complete integration of Phase 1 and Phase 2"""
     print("Testing Complete Phase 1 & 2 Integration...")
-    
+    # Snapshot shared-store counts: other test modules use the same
+    # singleton, so assert deltas instead of absolute totals.
+    _baseline = {
+        'institutions': len(store.institutions),
+        'subscriptions': len(store.subscriptions),
+        'users': len(store.users),
+        'profiles': len(store.profiles),
+        'invoices': len(store.invoices),
+        'payments': len(store.payments),
+    }
+
     # 1. Create institution (Phase 1)
     institution_id = str(uuid4())
     institution = {
@@ -247,13 +261,13 @@ def test_complete_integration():
     assert hasattr(store, 'odoo_sync_events')
     print("[PASS] Store collections (Phase 1 & 2)")
     
-    # 18. Test data consistency
-    assert len(store.institutions) == 1
-    assert len(store.subscriptions) == 1
-    assert len(store.users) == 7  # 5 students + 2 teachers
-    assert len(store.profiles) == 5
-    assert len(store.invoices) == 1
-    assert len(store.payments) == 1
+    # 18. Test data consistency (deltas created by this test)
+    assert len(store.institutions) == _baseline['institutions'] + 1
+    assert len(store.subscriptions) == _baseline['subscriptions'] + 1
+    assert len(store.users) == _baseline['users'] + 7  # 5 students + 2 teachers
+    assert len(store.profiles) == _baseline['profiles'] + 5
+    assert len(store.invoices) == _baseline['invoices'] + 1
+    assert len(store.payments) == _baseline['payments'] + 1
     print("[PASS] Data consistency across phases")
     
     # 19. Test audit trail (Phase 1)

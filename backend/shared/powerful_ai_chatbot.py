@@ -310,17 +310,23 @@ class PowerfulAIChatbot:
         }
         
         # Build messages for AI
-        messages = [AIMessage(role=MessageRole.SYSTEM, content=system_prompt)]
-        
-        # Add conversation history (last 10 messages)
-        for msg in conversation_history[-10:]:
-            messages.append(AIMessage(
-                role=MessageRole.USER if msg.role == "user" else MessageRole.ASSISTANT,
-                content=msg.content
-            ))
-        
+        def _msg(role, content):
+            return ConversationMessage(
+                id=str(uuid4()),
+                conversation_id=thread.id,
+                role=role,
+                content=content,
+                timestamp=datetime.now(timezone.utc),
+            )
+
+        messages = [_msg(MessageRole.SYSTEM, system_prompt)]
+
+        # Add conversation history (formatted string) as context
+        if conversation_history:
+            messages.append(_msg(MessageRole.SYSTEM, f"Conversation so far:\n{conversation_history}"))
+
         # Add current message
-        messages.append(AIMessage(role=MessageRole.USER, content=user_message))
+        messages.append(_msg(MessageRole.USER, user_message))
         
         # Get real AI response
         try:
